@@ -4,11 +4,14 @@ from typing import Dict
 import gtsam
 import matplotlib.pyplot as plt
 import numpy as np
+import cv2
 
 from .utils import ps_and_qs_from_values
 
 import pudb
 
+# 初始化图形和轴对象
+fig, ax, color_map, available_colors, placeholder_keys = None, None
 
 def _axis_limits(ps, qs):
     xs = ([p.translation()[0] for p in ps] + [q.bounds().xmin() for q in qs] +
@@ -55,12 +58,35 @@ def _set_axes_equal(ax):
     ax.set_zlim3d([z_middle - plot_radius, z_middle + plot_radius])
 
 
-def visualise(values: gtsam.Values,
-              labels: Dict[int, str],
-              block: bool = False):
+def initialise_visualisation(num: int = 20):
+    global fig, ax, color_map, available_colors, placeholder_keys
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    # plt.show(block=False)
+    # 全局存储颜色映射
+    color_map = {}
+    available_colors = plt.cm.tab20(np.linspace(0, 1, num))
+    placeholder_keys = [str(i) for i in range(num)]
+
+
+def visualise(values: gtsam.Values, labels: Dict[int, str], block: bool = False, num: int = 20):
+    global fig, ax, color_map, available_colors, placeholder_keys
+
+    global_params = [fig, ax, color_map, available_colors, placeholder_keys]
+    if any(param is None for param in global_params):
+        initialise_visualisation(num)
+
     # Generate colour swatch for our labels
     ls = set(labels.values())
-    cs = {l: c for l, c in zip(ls, get_colors(len(ls)))}
+    new_labels = ls.difference(color_map.keys())
+
+    if new_labels:
+        for label in new_labels:
+            if placeholder_keys:
+                placeholder = placeholder_keys.pop(0)
+                color_map[label] = available_colors[int(placeholder)]
+            else:
+                raise ValueError("No more available colors. Increase the number of initial colors.")
 
     # Get latest pose & quadric estimates
     full_ps, full_qs = ps_and_qs_from_values(values)
@@ -82,36 +108,44 @@ def visualise(values: gtsam.Values,
         np.array([p[2, 2] for p in ps]),
     )
 
-    ax = plt.gca(projection='3d')
+    # 清除之前的图像
     ax.clear()
+
     alphas = np.linspace(0.2, 1, len(ps))
     for i in range(1, len(ps)):
-        plt.plot(pxs[i - 1:i + 1],
-                 pys[i - 1:i + 1],
-                 pzs[i - 1:i + 1],
-                 color='k',
-                 alpha=alphas[i])
-    plt.quiver(pxs, pys, pzs, pxus * sf, pxvs * sf, pxws * sf, color='r')
-    plt.quiver(pxs, pys, pzs, pyus * sf, pyvs * sf, pyws * sf, color='g')
-    plt.quiver(pxs, pys, pzs, pzus * sf, pzvs * sf, pzws * sf, color='b')
+        ax.plot(pxs[i - 1:i + 1],
+                pys[i - 1:i + 1],
+                pzs[i - 1:i + 1],
+                color='k',
+                alpha=alphas[i])
+    ax.quiver(pxs, pys, pzs, pxus * sf, pxvs * sf, pxws * sf, color='r')
+    ax.quiver(pxs, pys, pzs, pyus * sf, pyvs * sf, pyws * sf, color='g')
+    ax.quiver(pxs, pys, pzs, pzus * sf, pzvs * sf, pzws * sf, color='b')
 
     for k, q in full_qs.items():
-        visualise_ellipsoid(q.pose().matrix(), q.radii(), cs[labels[k]])
+        visualise_ellipsoid(q.pose().matrix(), q.radii(), color_map[labels[k]])
 
+    print(f'绘制{len(full_qs)}个object')
     # Plot a legend for quadric colours
     ax.legend(handles=[
-        Patch(facecolor=c, edgecolor=c, label=l) for l, c in cs.items()
+        Patch(facecolor=c, edgecolor=c, label=l) for l, c in color_map.items()
     ])
 
-    # Show the final thing, blocking if requested
+    # 设置坐标轴标签
     ax.set_xlabel('x')
     ax.set_ylabel('y')
     ax.set_zlabel('z')
     ax.autoscale()
     _set_axes_equal(ax)
-    plt.show(block=block)
-    plt.pause(0.05)
 
+    # 显示更新后的图像
+    plt.draw()
+    # plt.pause(0.2)
+
+    if block:
+        plt.show(block=True)
+    else:
+        plt.show()
 
 def visualise_ellipsoid(pose: np.ndarray, radii: np.ndarray, color):
     # Generate ellipsoid of appropriate size at origin
@@ -130,7 +164,8 @@ def visualise_ellipsoid(pose: np.ndarray, radii: np.ndarray, color):
     ])
 
     # Plot the ellipsoid
-    plt.gca().plot_wireframe(
+    ax = plt.gca()
+    ax.plot_wireframe(
         ps[0, :].reshape(SZ, SZ),
         ps[1, :].reshape(SZ, SZ),
         ps[2, :].reshape(SZ, SZ),

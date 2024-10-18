@@ -43,14 +43,17 @@ class QuadricIouAssociator(DataAssociator):
 
         # Compute IOU matrix for each unassociated detection
         ious = np.zeros((len(n.detections), len(qs.values())))
+        pose = gtsam.Pose3(n.odom)
+        calib = gtsam.Cal3_S2(s.calib_rgb)
+
         for i, b in enumerate(
             [gtsam_quadrics.AlignedBox2(d.bounds) for d in n.detections]):
             for j, q in enumerate(qs.values()):
                 # Note: smartBounds() can be used here for more accuracy?
                 ious[i, j] = b.iou(
-                    gtsam_quadrics.QuadricCamera.project(
-                        q, gtsam.Pose3(n.odom),
-                        gtsam.Cal3_S2(s.calib_rgb)).bounds())
+                            gtsam_quadrics.QuadricCamera.project(
+                            q, gtsam.Pose3(n.odom),
+                            gtsam.Cal3_S2(s.calib_rgb)).bounds())
                 if np.isnan(ious[i, j]):
                     ious[i, j] = 0
 
@@ -66,5 +69,7 @@ class QuadricIouAssociator(DataAssociator):
                 i += 1
             else:
                 n.detections[di].quadric_key = list(qs.keys())[qi]
+            # print(n.detections[di].quadric_key)
 
         return (n.detections, n.detections + s.associated, [])
+

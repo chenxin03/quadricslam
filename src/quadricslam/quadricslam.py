@@ -80,8 +80,7 @@ class QuadricSlam:
         self.reset()
 
     def guess_initial_values(self) -> None:
-        # Guessing approach (only guess values that don't already have an
-        # estimate):
+        # Guessing approach (only guess values that don't already have an estimate):
         # - guess poses using dead reckoning
         # - guess quadrics using Euclidean mean of all observations
         s = self.state.system
@@ -120,10 +119,9 @@ class QuadricSlam:
         # Add all quadric factors
         _ok = lambda x: x.objectKey()
         bbs = sorted([
-            f for f in fs if type(f) == gtsam_quadrics.BoundingBoxFactor and
-            not s.estimates.exists(f.objectKey())
-        ],
-                     key=_ok)
+                    f for f in fs if type(f) == gtsam_quadrics.BoundingBoxFactor and
+                    not s.estimates.exists(f.objectKey())],
+                    key=_ok)
         for qbbs in [list(v) for k, v in groupby(bbs, _ok)]:
             self.quadric_initialiser(
                 [s.estimates.atPose3(bb.poseKey()) for bb in qbbs],
@@ -144,48 +142,47 @@ class QuadricSlam:
                 self.on_new_estimate(self.state)
 
     def step(self) -> None:
-        # Setup state for the current step
+        # 设置当前步骤的状态
         s = self.state.system
         p = self.state.prev_step
         n = StepState(
             0 if self.state.prev_step is None else self.state.prev_step.i + 1)
         self.state.this_step = n
 
-        # Get latest data from the scene (odom, images, and detections)
+        # 从场景中获取最新数据（里程计、图像及检测结果）
         n.odom, n.rgb, n.depth = (self.data_source.next(self.state))
         if self.visual_odometry is not None:
             n.odom = self.visual_odometry.odom(self.state)
         n.detections = (self.detector.detect(self.state)
                         if self.detector else [])
-        n.new_associated, s.associated, s.unassociated = (
-            self.associator.associate(self.state))
+        n.new_associated, s.associated, s.unassociated = (self.associator.associate(self.state))
+        print(f'新增关联：{len(n.new_associated)} 个')
 
-        # Extract some labels
-        # TODO handle cases where different labels used for a single quadric???
+        # 提取一些标签信息
+        # TODO 处理单个二次曲面使用不同标签的情况
         s.labels = {
             d.quadric_key: d.label
             for d in s.associated
             if d.quadric_key is not None
         }
 
-        # # Add new pose to the factor graph
+        # 将新姿态添加到因子图中
         if p is None:
             s.graph.add(
                 gtsam.PriorFactorPose3(n.pose_key, s.initial_pose,
-                                       s.noise_prior))
+                                    s.noise_prior))
         else:
             s.graph.add(
                 gtsam.BetweenFactorPose3(
                     p.pose_key, n.pose_key,
                     gtsam.Pose3(((SE3() if p.odom is None else p.odom).inv() *
-                                 (SE3() if n.odom is None else n.odom)).A),
+                                (SE3() if n.odom is None else n.odom)).A),
                     s.noise_odom))
 
-        # Add any newly associated detections to the factor graph
+        # 将新关联的检测结果添加到因子图中
         for d in n.new_associated:
             if d.quadric_key is None:
-                print("WARN: skipping associated detection with "
-                      "quadric_key == None")
+                print("WARN: 跳过具有 None 类型 quadric_key 的关联检测")
                 continue
             s.graph.add(
                 gtsam_quadrics.BoundingBoxFactor(
@@ -193,26 +190,27 @@ class QuadricSlam:
                     gtsam.Cal3_S2(s.calib_rgb), d.pose_key, d.quadric_key,
                     s.noise_boxes))
 
-        # Optimise if we're in iterative mode
+        # 如果处于迭代模式，则进行优化
         if not s.optimiser_batch:
             self.guess_initial_values()
             if s.optimiser is None:
                 s.optimiser = s.optimiser_type(s.optimiser_params)
             try:
+                # print(f'optimiser set {s.optimiser}')
                 # pu.db
                 s.optimiser.update(
                     new_factors(s.graph, s.optimiser.getFactorsUnsafe()),
                     new_values(s.estimates,
-                               s.optimiser.getLinearizationPoint()))
+                            s.optimiser.getLinearizationPoint()))
                 s.estimates = s.optimiser.calculateEstimate()
             except RuntimeError as e:
-                # For handling gtsam::InderminantLinearSystemException:
-                #   https://gtsam.org/doxygen/a03816.html
+                # 处理 gtsam::IndeterminateLinearSystemException 异常
                 pass
             if self.on_new_estimate:
                 self.on_new_estimate(self.state)
-
+            
         self.state.prev_step = n
+
 
     def reset(self) -> None:
         self.data_source.restart()

@@ -42,10 +42,16 @@ class RgbdCv2(VisualOdometry):
         # Compute an odometry estimate using grayscale version of the RGB image
         t = np.eye(4)
         mask = np.ones(n.rgb.shape[:-1], np.uint8)
-        self.odometry.compute(cv2.cvtColor(p.rgb,
-                                           cv2.COLOR_RGB2GRAY), p.depth, mask,
-                              cv2.cvtColor(n.rgb, cv2.COLOR_RGB2GRAY), n.depth,
-                              mask, t)
-        self.prev_odom = (SE3() if self.prev_odom is None else self.prev_odom *
-                          SE3(t))
+        # print(f'p.rgb.dtype:{p.rgb.dtype}, shape:{p.rgb.shape}')
+        # print(f'p.depth.dtype:{p.depth.dtype}, shape:{p.depth.shape}')
+        # print(f'n.rgb.dtype:{n.rgb.dtype}, shape:{n.rgb.shape}')
+        # print(f'n.depth.dtype:{n.depth.dtype}, shape:{n.depth.shape}')
+        self.odometry.compute(cv2.cvtColor(p.rgb,cv2.COLOR_RGB2GRAY), 
+                              p.depth, 
+                              mask,
+                              cv2.cvtColor(n.rgb, cv2.COLOR_RGB2GRAY), 
+                              n.depth,
+                              mask, 
+                              t)
+        self.prev_odom = (SE3() if self.prev_odom is None else self.prev_odom * SE3(t))
         return self.prev_odom

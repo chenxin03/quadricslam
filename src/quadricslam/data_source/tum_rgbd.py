@@ -69,6 +69,7 @@ class TumRgbd(DataSource):
         return self.rgb_calib
 
     def done(self) -> bool:
+        # return self.data_i == 1
         return self.data_i == self.data_length
 
     def next(
@@ -76,11 +77,11 @@ class TumRgbd(DataSource):
     ) -> Tuple[Optional[SE3], Optional[np.ndarray], Optional[np.ndarray]]:
         i = self.data_i
         self.data_i += 1
-        return (SE3() if i == 0 else self._gt_to_SE3(i) *
-                self._gt_to_SE3(i - 1).inv(),
-                cv2.imread(
-                    os.path.join(self.path,
-                                 cast(str, self.data['rgb'][i][1]))), None)
+        return (
+            SE3() if i == 0 else self._gt_to_SE3(i) * self._gt_to_SE3(i - 1).inv(),
+            cv2.imread(os.path.join(self.path,cast(str, self.data['rgb'][i][1]))), 
+            None
+            )
 
     def restart(self) -> None:
         self.data_i = 0

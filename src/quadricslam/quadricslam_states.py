@@ -40,7 +40,6 @@ class StepState:
 
 
 class SystemState:
-
     def __init__(
         self,
         initial_pose: SE3,

@@ -7,9 +7,11 @@ import spatialmath as sm
 import sys
 import textwrap
 
-from quadricslam import QuadricSlam, visualise
+from quadricslam.data_associator.quadric_iou_associator import QuadricIouAssociator
+from quadricslam import QuadricSlam, visualise, utils
 from quadricslam.data_source.tum_rgbd import TumRgbd
 from quadricslam.detector.faster_rcnn import FasterRcnn
+from quadricslam.detector.yolov8 import YoloV8Detector
 
 import pudb
 
@@ -43,11 +45,13 @@ def run():
 
     # Run QuadricSLAM
     q = QuadricSlam(
-        data_source=TumRgbd(path=dataset_path, rgb_calib=camera_calib),
-        detector=FasterRcnn(),
+        data_source=TumRgbd(path=dataset_path, rgb_calib=camera_calib, depth_calib=5000),
+        detector=YoloV8Detector(model_path='/home/cnbot/zz/slam/yolov8m.pt', detection_thresh=0.7,is_show=True),
         # TODO needs a viable data association approach
-        on_new_estimate=(
-            lambda vals, labels, done: visualise(vals, labels, done)))
+        associator=QuadricIouAssociator(iou_thresh=0.05),
+        on_new_estimate=(lambda state: visualise(state.system.estimates, state.system.labels, state.system.optimiser_batch)),
+        quadric_initialiser=utils.initialise_quadric_from_depth
+        )
     q.spin()
 
 
