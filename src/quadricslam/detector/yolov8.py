@@ -13,6 +13,7 @@ class YoloV8Detector(Detector):
     def __init__(
             self, model_path: str = 'yolov8n.pt', 
             detection_thresh: float = 0.5,
+            is_save: bool = False,
             is_show: bool = False) -> None:
         """
         初始化YOLOv8模型。
@@ -23,6 +24,7 @@ class YoloV8Detector(Detector):
         self.model = YOLO(model_path)
         self.detection_thresh = detection_thresh
         self.is_show = is_show
+        self.save = is_save
 
     def detect(self, state: QuadricSlamState) -> List[Detection]:
         """
@@ -36,7 +38,7 @@ class YoloV8Detector(Detector):
         n = state.this_step
 
         # 使用YOLOv8模型进行预测
-        results = self.model(n.rgb, show=self.is_show, save=True, conf=self.detection_thresh)
+        results = self.model(n.rgb, show=self.is_show, save=self.save, conf=self.detection_thresh)
 
         # 解析结果
         detections = []

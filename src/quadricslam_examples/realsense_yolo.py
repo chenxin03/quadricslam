@@ -17,25 +17,24 @@ depth_txt_path = '/home/cnbot/zz/slam/datasets/depth_path.txt'
 
 def run():
     # print('start run')
-    ds = TumRgbd(dataset_path='/home/cnbot/zz/slam/datasets/rgbd_dataset_freiburg1_rpy')
+    
     # with SingleImageSource(rgb_txt_path=rgb_txt_path, depth_txt_path=depth_txt_path) as ds:
     q = QuadricSlam(
         # 数据读取模块
-        data_source=ds,        
+        data_source = TumRgbd(dataset_path='/home/cnbot/zz/slam/datasets/rgbd_dataset_freiburg1_desk', step=0),        
         # 目标检测模块
-        detector=YoloV8Detector(model_path='/home/cnbot/zz/slam/yolov8m.pt', detection_thresh=0.7,is_show=True),
+        detector = YoloV8Detector(model_path='/home/cnbot/zz/slam/yolov8m.pt', detection_thresh=0.7, is_save=False, is_show=True),
         # 视觉里程计     
         visual_odometry=RgbdCv2(),    
         # 关联器，推断每一帧检测目标与上一帧目标的关联性，判断是否为同一目标  
-        associator=QuadricIouAssociator(iou_thresh=0.05),    
+        associator = QuadricIouAssociator(iou_thresh=0.05),    
         # 是否使用批处理  
-        optimiser_batch=False,      
-        # on_new_estimate=(lambda state: visualise_draw(state.this_step.rgb, state.system.estimates, state.system.labels)),
-        on_new_estimate=(lambda state: visualise(state.system.estimates, state.system.labels, state.system.optimiser_batch)),
-        quadric_initialiser=utils.initialise_quadric_from_depth)
+        optimiser_batch = False,      
+        # on_new_estimate = (lambda state: visualise_draw(state.this_step.rgb, state.system.estimates, state.system.labels)),
+        on_new_estimate = (lambda state: visualise(state.system.estimates, state.system.labels, state.system.optimiser_batch)),
+        quadric_initialiser = utils.initialise_quadric_from_depth)
     # print('q init')
-    q.spin()    
-
+    state = q.spin(return_s=True)    
 
 if __name__ == '__main__':
     run()

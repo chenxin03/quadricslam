@@ -11,7 +11,7 @@ from .utils import ps_and_qs_from_values
 import pudb
 
 # 初始化图形和轴对象
-fig, ax, color_map, available_colors, placeholder_keys = None, None
+fig, ax, color_map, available_colors, placeholder_keys = None, None, None, None, None
 
 def _axis_limits(ps, qs):
     xs = ([p.translation()[0] for p in ps] + [q.bounds().xmin() for q in qs] +
@@ -76,10 +76,9 @@ def visualise(values: gtsam.Values, labels: Dict[int, str], block: bool = False,
     if any(param is None for param in global_params):
         initialise_visualisation(num)
 
-    # Generate colour swatch for our labels
+    # 生成颜色映射
     ls = set(labels.values())
     new_labels = ls.difference(color_map.keys())
-
     if new_labels:
         for label in new_labels:
             if placeholder_keys:
@@ -88,11 +87,15 @@ def visualise(values: gtsam.Values, labels: Dict[int, str], block: bool = False,
             else:
                 raise ValueError("No more available colors. Increase the number of initial colors.")
 
-    # Get latest pose & quadric estimates
+    # 获取最新的椭圆体位姿估计值
     full_ps, full_qs = ps_and_qs_from_values(values)
+    # 计算缩放因子
     sf = 0.1 * _scale_factor(full_ps.values(), full_qs.values())
+    print(sf)
+    # sf = 1.0
+    # 提取位姿矩阵
     ps = [p.matrix() for p in full_ps.values()]
-
+    # 提取坐标和方向信息
     pxs, pys, pzs, pxus, pxvs, pxws, pyus, pyvs, pyws, pzus, pzvs, pzws = (
         np.array([p[0, 3] for p in ps]),
         np.array([p[1, 3] for p in ps]),
@@ -108,6 +111,7 @@ def visualise(values: gtsam.Values, labels: Dict[int, str], block: bool = False,
         np.array([p[2, 2] for p in ps]),
     )
 
+    plt.ion()
     # 清除之前的图像
     ax.clear()
 
@@ -140,9 +144,10 @@ def visualise(values: gtsam.Values, labels: Dict[int, str], block: bool = False,
 
     # 显示更新后的图像
     plt.draw()
-    # plt.pause(0.2)
+    plt.pause(0.01)
 
     if block:
+        plt.ioff()
         plt.show(block=True)
     else:
         plt.show()

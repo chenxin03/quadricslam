@@ -128,7 +128,7 @@ class QuadricSlam:
                 [bb.measurement() for bb in qbbs],
                 self.state).addToValues(s.estimates, qbbs[0].objectKey())
 
-    def spin(self) -> None:
+    def spin(self, return_s: bool=False) -> None:
         while not self.data_source.done():
             self.step()
 
@@ -138,8 +138,12 @@ class QuadricSlam:
             s.optimiser = s.optimiser_type(s.graph, s.estimates,
                                            s.optimiser_params)
             s.estimates = s.optimiser.optimize()
-            if self.on_new_estimate:
-                self.on_new_estimate(self.state)
+        if self.on_new_estimate:
+            self.state.system.optimiser_batch = True
+            self.on_new_estimate(self.state)
+
+        if return_s:
+            return self.state
 
     def step(self) -> None:
         # 设置当前步骤的状态
@@ -150,11 +154,15 @@ class QuadricSlam:
         self.state.this_step = n
 
         # 从场景中获取最新数据（里程计、图像及检测结果）
-        n.odom, n.rgb, n.depth = (self.data_source.next(self.state))
-        if self.visual_odometry is not None:
-            n.odom = self.visual_odometry.odom(self.state)
+        n.odom, n.rgb, n.depth = (self.data_source.next())
+        # 数据源没有传递位姿时，使用位姿里程计计算
+        if n.odom == None:
+            if self.visual_odometry is not None:
+                n.odom = self.visual_odometry.odom(self.state)
+        # 物体检测
         n.detections = (self.detector.detect(self.state)
                         if self.detector else [])
+        # 关联器筛选新增物体
         n.new_associated, s.associated, s.unassociated = (self.associator.associate(self.state))
         print(f'新增关联：{len(n.new_associated)} 个')
 

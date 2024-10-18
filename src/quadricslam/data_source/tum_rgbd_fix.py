@@ -12,7 +12,8 @@ from . import DataSource
 class TumRgbd(DataSource):
     def __init__(self, dataset_path: str, 
                  rgb_calib: np.ndarray = [517.3, 516.5, 0, 318.6, 255.3], 
-                 depth_calib: float = 5000) -> None:
+                 depth_calib: float = 5000,
+                 step: int = 0) -> None:
         # Validate path exists
         self.base_path = dataset_path
         if not os.path.isdir(self.base_path):
@@ -25,7 +26,10 @@ class TumRgbd(DataSource):
         # Derive synced dataset (aligning on depth as it always has the least
         # data)
         self._load_data()
-
+        if step == 0:
+            self.step = self.data_length
+        else:
+            self.step = step
         self.restart()
 
     def _load_data(self):
@@ -59,9 +63,7 @@ class TumRgbd(DataSource):
         self.data_length = len(self.data['depth'])
 
 
-    def next(
-        self, state: QuadricSlamState
-    ) -> Tuple[Optional[SE3], Optional[np.ndarray], Optional[np.ndarray]]:
+    def next(self) -> Tuple[Optional[SE3], Optional[np.ndarray], Optional[np.ndarray]]:
         i = self.data_i
         self.data_i += 1
 
@@ -92,8 +94,7 @@ class TumRgbd(DataSource):
         return SE3.Rt(UnitQuaternion(f[6], f[3:6]).SO3(), f[0:3])
 
     def done(self) -> bool:
-        return self.data_i == self.data_length
-        # return self.data_i == 1
+        return self.data_i == self.step
 
     
     def restart(self) -> None:
