@@ -67,6 +67,7 @@ def initialise_quadric_ray_intersection(
     s = state.system
     assert s.calib_rgb is not None
     calib = s.calib_rgb
+    calib = np.ndarray = [517.3, 516.5, 0, 318.6, 255.3]
 
     # 获取每个观测点的方向
     # TODO 实际上使用包围框而不是假设中间位置...
@@ -75,8 +76,9 @@ def initialise_quadric_ray_intersection(
     for pose, box in zip(obs_poses, boxes):
         center = box.center()
         depth = state.this_step.depth[int(center[1]), int(center[0])]
-        x = (center[0] - calib.px()) * depth / calib.fx()
-        y = (center[1] - calib.py()) * depth / calib.fy()
+        x = float((center[0] - calib[3]) * depth / calib[0])
+        y = float((center[1] - calib[4]) * depth / calib[1])
+        print(f'x:{x}\ny:{y}\ndepth:{depth}')
         relative_point = gtsam.Point3(x, y, depth)
         direction = pose.rotation().matrix() @ relative_point.vector()
         vs.append(direction / np.linalg.norm(direction))

@@ -63,7 +63,7 @@ class TumRgbd(DataSource):
         self.data_length = len(self.data['depth'])
 
 
-    def next(self) -> Tuple[Optional[SE3], Optional[np.ndarray], Optional[np.ndarray]]:
+    def next(self, state: QuadricSlamState) -> Tuple[Optional[SE3], Optional[np.ndarray], Optional[np.ndarray]]:
         i = self.data_i
         self.data_i += 1
 
@@ -72,7 +72,8 @@ class TumRgbd(DataSource):
 
         return (
                 # None,
-                SE3() if i == 0 else self._gt_to_SE3(i) * self._gt_to_SE3(i - 1).inv(),
+                # SE3() if i == 0 else self._gt_to_SE3(i) * self._gt_to_SE3(i - 1).inv(),
+                self._gt_to_SE3(i),
                 rgb_image, 
                 # None
                 # 增加对depth的读取

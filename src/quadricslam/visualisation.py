@@ -5,6 +5,8 @@ import gtsam
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
+import os
+from typing import Union, Tuple, List
 
 from .utils import ps_and_qs_from_values
 
@@ -69,7 +71,11 @@ def initialise_visualisation(num: int = 20):
     placeholder_keys = [str(i) for i in range(num)]
 
 
-def visualise(values: gtsam.Values, labels: Dict[int, str], block: bool = False, num: int = 20):
+def visualise(values: gtsam.Values = None, 
+              labels: Dict[int, str] = None, 
+              block: bool = False, 
+              num: int = 20
+              ):
     global fig, ax, color_map, available_colors, placeholder_keys
 
     global_params = [fig, ax, color_map, available_colors, placeholder_keys]
@@ -152,6 +158,83 @@ def visualise(values: gtsam.Values, labels: Dict[int, str], block: bool = False,
     else:
         plt.show()
 
+
+def visualise_fromlist(cap: List[np.ndarray], 
+              Obj: List[List[np.ndarray]]
+              ):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    cap_pose = cap
+    obj_pose, obj_radius, labels = Obj 
+
+    # 获取唯一的标签
+    unique_labels = list(set(labels))
+    # 生成颜色映射
+    colors = plt.cm.tab20(range(len(unique_labels)))
+    # 创建标签到颜色的映射字典
+    color_map = {label: colors[i] for i, label in enumerate(unique_labels)}
+
+    # 缩放系数
+    sf = 0.5
+
+    # 提取坐标和方向信息
+    pxs, pys, pzs, pxus, pxvs, pxws, pyus, pyvs, pyws, pzus, pzvs, pzws = (
+        np.array([p[0, 3] for p in cap_pose]),
+        np.array([p[1, 3] for p in cap_pose]),
+        np.array([p[2, 3] for p in cap_pose]),
+        np.array([p[0, 0] for p in cap_pose]),
+        np.array([p[1, 0] for p in cap_pose]),
+        np.array([p[2, 0] for p in cap_pose]),
+        np.array([p[0, 1] for p in cap_pose]),
+        np.array([p[1, 1] for p in cap_pose]),
+        np.array([p[2, 1] for p in cap_pose]),
+        np.array([p[0, 2] for p in cap_pose]),
+        np.array([p[1, 2] for p in cap_pose]),
+        np.array([p[2, 2] for p in cap_pose]),
+    )
+
+    ax.clear()
+
+    alphas = np.linspace(0.2, 1, len(cap_pose))
+    for i in range(1, len(cap_pose)):
+        ax.plot(pxs[i - 1:i + 1],
+                pys[i - 1:i + 1],
+                pzs[i - 1:i + 1],
+                color='k',
+                alpha=alphas[i])
+    ax.quiver(pxs, pys, pzs, pxus * sf, pxvs * sf, pxws * sf, color='r')
+    ax.quiver(pxs, pys, pzs, pyus * sf, pyvs * sf, pyws * sf, color='g')
+    ax.quiver(pxs, pys, pzs, pzus * sf, pzvs * sf, pzws * sf, color='b')
+
+    for pose, radiu, label in zip(obj_pose, obj_radius, labels):
+        visualise_ellipsoid(pose, radiu, color_map[label])
+
+    label_counts = {label: labels.count(label) for label in unique_labels}
+    # 构建输出字符串
+    output = f'绘制{len(labels)}个object：'
+    for label in unique_labels:
+        output += f'{label} * {label_counts[label]}  '
+    print(output)
+
+    # Plot a legend for quadric colours
+    ax.legend(handles=[
+        Patch(facecolor=c, edgecolor=c, label=l) for l, c in color_map.items()
+    ])
+
+    # 设置坐标轴标签
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
+    ax.autoscale()
+    _set_axes_equal(ax)
+
+    # 显示更新后的图像
+    plt.draw()
+    plt.show(block=True)
+
+
+
 def visualise_ellipsoid(pose: np.ndarray, radii: np.ndarray, color):
     # Generate ellipsoid of appropriate size at origin
     SZ = 50
@@ -179,3 +262,31 @@ def visualise_ellipsoid(pose: np.ndarray, radii: np.ndarray, color):
         edgecolors=color,
         linewidth=0.5,
     )
+
+
+def read_csv(dir: str) -> Tuple[List[np.ndarray], List[np.ndarray], List[np.ndarray]]:
+    # 读取CSV文件
+    data_ps = np.genfromtxt(os.path.join(dir, 'CapturePose.csv'), delimiter=',', skip_header=1, dtype=None, encoding='utf-8')
+    data_qs = np.genfromtxt(os.path.join(dir, 'Object.csv'), delimiter=',', skip_header=1, dtype=None, encoding='utf-8')
+    # print(data_qs)
+    poses_cap = []
+    poses_obj = []
+    radius = []
+    labels = []
+    for i in range(len(data_ps)):
+        row_ps = data_ps[i]
+        pose_cap = np.array([[row_ps[0], row_ps[1], row_ps[2], row_ps[3]],
+                            [row_ps[4], row_ps[5], row_ps[6], row_ps[7]],
+                            [row_ps[8], row_ps[9], row_ps[10], row_ps[11]],
+                            [row_ps[12], row_ps[13], row_ps[14], row_ps[15]]])
+        poses_cap.append(pose_cap)
+    for j in range(len(data_qs)):
+        row_qs = data_qs[j]
+        pose_obj = np.array([[row_qs[0], row_qs[1], row_qs[2], row_qs[3]],
+                            [row_qs[4], row_qs[5], row_qs[6], row_qs[7]],
+                            [row_qs[8], row_qs[9], row_qs[10], row_qs[11]],
+                            [row_qs[12], row_qs[13], row_qs[14], row_qs[15]]])    
+        poses_obj.append(pose_obj)
+        radius.append(np.array([row_qs[16], row_qs[17], row_qs[18]]))
+        labels.append(row_qs[19])
+    return poses_cap, [poses_obj, radius, labels]

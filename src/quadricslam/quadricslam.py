@@ -154,7 +154,7 @@ class QuadricSlam:
         self.state.this_step = n
 
         # 从场景中获取最新数据（里程计、图像及检测结果）
-        n.odom, n.rgb, n.depth = (self.data_source.next())
+        n.odom, n.rgb, n.depth = (self.data_source.next(self.state))
         # 数据源没有传递位姿时，使用位姿里程计计算
         if n.odom == None:
             if self.visual_odometry is not None:
