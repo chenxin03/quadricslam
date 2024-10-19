@@ -80,22 +80,22 @@ class QuadricSlam:
         self.reset()
 
     def guess_initial_values(self) -> None:
-        # Guessing approach (only guess values that don't already have an estimate):
-        # - guess poses using dead reckoning
-        # - guess quadrics using Euclidean mean of all observations
+        # 猜测方法（只对没有估计值的变量进行猜测）:
+        # - 使用航位推算猜测位姿
+        # - 使用所有观测数据的欧几里得平均值猜测二次曲面
         s = self.state.system
 
+        # 获取图中所有因子
         fs = [s.graph.at(i) for i in range(0, s.graph.nrFactors())]
-
-        # Start with prior factors
+        
+        # 没有估计值的位姿添加估计值
         for pf in [
                 f for f in fs if type(f) == gtsam.PriorFactorPose3 and
                 not s.estimates.exists(f.keys()[0])
         ]:
             s.estimates.insert(pf.keys()[0], pf.prior())
 
-        # Add all between factors one-by-one (should never be any remaining,
-        # but if they are just dump them at the origin after the main loop)
+        # 逐个添加相对因子，剩余因子迁移至原点
         bfs = [f for f in fs if type(f) == gtsam.BetweenFactorPose3]
         done = False
         while not done:
@@ -116,12 +116,13 @@ class QuadricSlam:
         ]:
             s.estimates.insert(bf.keys()[1], gtsam.Pose3())
 
-        # Add all quadric factors
+        # 将所有的物体因子按objectkey排序
         _ok = lambda x: x.objectKey()
         bbs = sorted([
                     f for f in fs if type(f) == gtsam_quadrics.BoundingBoxFactor and
                     not s.estimates.exists(f.objectKey())],
                     key=_ok)
+        # 按objectkey分组，为所有物体初始化二次曲面
         for qbbs in [list(v) for k, v in groupby(bbs, _ok)]:
             self.quadric_initialiser(
                 [s.estimates.atPose3(bb.poseKey()) for bb in qbbs],
