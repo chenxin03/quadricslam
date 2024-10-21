@@ -73,3 +73,27 @@ class QuadricIouAssociator(DataAssociator):
 
         return (n.detections, n.detections + s.associated, [])
 
+
+class DefaultAssociator(DataAssociator):
+
+    def __init__(self, ) -> None:
+        pass
+
+    def associate(
+        self, state: QuadricSlamState
+    ) -> Tuple[List[Detection], List[Detection], List[Detection]]:
+        assert state.system.calib_rgb is not None
+        assert state.this_step is not None
+        assert state.this_step.odom is not None
+        
+        s = state.system
+        n = state.this_step
+        ps, qs = ps_and_qs_from_values(state.system.estimates)
+        next_q = (0 if len(qs.values()) == 0 else (
+            max([int(gtsam.Symbol(k).string()[1:]) for k in qs.keys()]) + 1))
+
+        # Bail early if there's no quadrics yet to match against (each box is
+        # treated as a new quadric)
+        for i, d in enumerate(n.detections):
+            d.quadric_key = QI(next_q + i)
+        return (n.detections, n.detections + s.associated, [])

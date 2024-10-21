@@ -1,6 +1,7 @@
 from itertools import groupby
 from types import FunctionType
 from typing import Callable, Dict, List, Optional, Union
+import cv2
 
 import gtsam
 import gtsam_quadrics
@@ -42,9 +43,9 @@ class QuadricSlam:
     ) -> None:
         # TODO this needs a default data associator, we can't do anything
         # meaningful if this is None...
-        if associator is None:
-            raise NotImplementedError('No default data associator yet exists, '
-                                      'so you must provide one.')
+        # if associator is None:
+        #     raise NotImplementedError('No default data associator yet exists, '
+        #                               'so you must provide one.')
         self.associator = associator
         self.data_source = data_source
         self.detector = detector
@@ -157,20 +158,30 @@ class QuadricSlam:
         # 从场景中获取最新数据（里程计、图像及检测结果）
         n.odom, n.rgb, n.depth = (self.data_source.next(self.state))
         # 数据源没有传递位姿时，使用位姿里程计计算
-        if n.odom == None:
+        if n.odom is None:
             if self.visual_odometry is not None:
                 n.odom = self.visual_odometry.odom(self.state)
         # 物体检测
         n.detections = (self.detector.detect(self.state)
                         if self.detector else [])
-        # 关联器筛选新增物体
-        n.new_associated, s.associated, s.unassociated = (self.associator.associate(self.state))
+        if self.associator is not None:
+            # 关联器筛选新增物体
+            n.new_associated, s.associated, s.unassociated = (self.associator.associate(self.state))
+        else:
+            n.new_associated = n.detections
+            s.associated = n.detections
         print(f'新增关联：{len(n.new_associated)} 个')
-
+ 
+        for i in range(len(s.associated)):
+            x1, y1, x2, y2 = s.associated[i].bounds
+            depth_ = n.depth[int(y1) : int(y2), int(x1) : int(x2)]
+            depth_mean = np.mean(depth_)
+            s.associated[i].depth_mean = depth_mean
+        
         # 提取一些标签信息
         # TODO 处理单个二次曲面使用不同标签的情况
         s.labels = {
-            d.quadric_key: d.label
+            d.quadric_key: d.label + ' depth:' + str(d.depth_mean)
             for d in s.associated
             if d.quadric_key is not None
         }

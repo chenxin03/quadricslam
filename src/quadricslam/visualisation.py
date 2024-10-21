@@ -97,7 +97,7 @@ def visualise(values: gtsam.Values = None,
     full_ps, full_qs = ps_and_qs_from_values(values)
     # 计算缩放因子
     sf = 0.1 * _scale_factor(full_ps.values(), full_qs.values())
-    print(sf)
+    # print(sf)
     # sf = 1.0
     # 提取位姿矩阵
     ps = [p.matrix() for p in full_ps.values()]
@@ -166,14 +166,16 @@ def visualise_fromlist(cap: List[np.ndarray],
     ax = fig.add_subplot(111, projection='3d')
 
     cap_pose = cap
-    obj_pose, obj_radius, labels = Obj 
+    obj_pose, obj_radius, labels, colors = Obj 
 
     # 获取唯一的标签
     unique_labels = list(set(labels))
-    # 生成颜色映射
-    colors = plt.cm.tab20(range(len(unique_labels)))
-    # 创建标签到颜色的映射字典
-    color_map = {label: colors[i] for i, label in enumerate(unique_labels)}
+
+    rgba = []
+    for color in colors:
+        rgb = [float(i) / 255.0 for i in color]
+        rgba.append(rgb + [1])
+    # print(rgba)
 
     # 缩放系数
     sf = 0.5
@@ -207,19 +209,19 @@ def visualise_fromlist(cap: List[np.ndarray],
     ax.quiver(pxs, pys, pzs, pyus * sf, pyvs * sf, pyws * sf, color='g')
     ax.quiver(pxs, pys, pzs, pzus * sf, pzvs * sf, pzws * sf, color='b')
 
-    for pose, radiu, label in zip(obj_pose, obj_radius, labels):
-        visualise_ellipsoid(pose, radiu, color_map[label])
+    for pose, radiu, label, color in zip(obj_pose, obj_radius, labels, rgba):
+        visualise_ellipsoid(pose, radiu, color)
 
     label_counts = {label: labels.count(label) for label in unique_labels}
     # 构建输出字符串
     output = f'绘制{len(labels)}个object：'
     for label in unique_labels:
-        output += f'{label} * {label_counts[label]}  '
+        output += f' {label_counts[label]} * {label} '
     print(output)
 
-    # Plot a legend for quadric colours
+    # 图例
     ax.legend(handles=[
-        Patch(facecolor=c, edgecolor=c, label=l) for l, c in color_map.items()
+        Patch(facecolor=c, edgecolor=c, label=l) for l, c in zip(labels, rgba)
     ])
 
     # 设置坐标轴标签
@@ -266,27 +268,46 @@ def visualise_ellipsoid(pose: np.ndarray, radii: np.ndarray, color):
 
 def read_csv(dir: str) -> Tuple[List[np.ndarray], List[np.ndarray], List[np.ndarray]]:
     # 读取CSV文件
-    data_ps = np.genfromtxt(os.path.join(dir, 'CapturePose.csv'), delimiter=',', skip_header=1, dtype=None, encoding='utf-8')
-    data_qs = np.genfromtxt(os.path.join(dir, 'Object.csv'), delimiter=',', skip_header=1, dtype=None, encoding='utf-8')
+    # data_ps = np.genfromtxt(os.path.join(dir, 'CapturePose.csv'), delimiter=',', skip_header=1, dtype=None, encoding='utf-8')
+    # data_qs = np.genfromtxt(os.path.join(dir, 'Object.csv'), delimiter=',', skip_header=1, dtype=None, encoding='utf-8')
+    data_ps = open(os.path.join(dir, 'CapturePose.csv'))
+    data_qs = open(os.path.join(dir, 'Object.csv'))
+
     # print(data_qs)
     poses_cap = []
     poses_obj = []
     radius = []
     labels = []
-    for i in range(len(data_ps)):
-        row_ps = data_ps[i]
-        pose_cap = np.array([[row_ps[0], row_ps[1], row_ps[2], row_ps[3]],
-                            [row_ps[4], row_ps[5], row_ps[6], row_ps[7]],
-                            [row_ps[8], row_ps[9], row_ps[10], row_ps[11]],
-                            [row_ps[12], row_ps[13], row_ps[14], row_ps[15]]])
+    colors = []
+    for line in data_ps:
+        if line[0] == 'p':
+            continue
+        data = line.strip().split(',')
+        data = [float(i) for i in data]
+        # print(data) 
+        pose_cap = np.array([[data[0], data[1], data[2], data[3]],
+                            [data[4], data[5], data[6], data[7]],
+                            [data[8], data[9], data[10], data[11]],
+                            [data[12], data[13], data[14], data[15]]])
         poses_cap.append(pose_cap)
-    for j in range(len(data_qs)):
-        row_qs = data_qs[j]
-        pose_obj = np.array([[row_qs[0], row_qs[1], row_qs[2], row_qs[3]],
-                            [row_qs[4], row_qs[5], row_qs[6], row_qs[7]],
-                            [row_qs[8], row_qs[9], row_qs[10], row_qs[11]],
-                            [row_qs[12], row_qs[13], row_qs[14], row_qs[15]]])    
+    for line in data_qs:
+        if line[0] == 'p':
+            continue
+        data = line.strip().split(',')
+        data[0:19] = [float(i) for i in data[0:19]]
+        color = [int(color_) for color_ in data[20:]]
+        # print(data)
+        pose_obj = np.array([[data[0], data[1], data[2], data[3]],
+                            [data[4], data[5], data[6], data[7]],
+                            [data[8], data[9], data[10], data[11]],
+                            [data[12], data[13], data[14], data[15]]])
         poses_obj.append(pose_obj)
-        radius.append(np.array([row_qs[16], row_qs[17], row_qs[18]]))
-        labels.append(row_qs[19])
-    return poses_cap, [poses_obj, radius, labels]
+        radius.append(np.array([data[16], data[17], data[18]]))
+        labels.append(data[19])
+        colors.append(color)
+    # print(poses_cap)
+    # print(poses_obj)
+    # print(radius)
+    # print(labels)
+    # print(colors)
+    return poses_cap, [poses_obj, radius, labels, colors]

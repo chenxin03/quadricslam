@@ -23,6 +23,7 @@ class Detection:
         self.bounds = bounds
         self.pose_key = pose_key
         self.quadric_key = quadric_key
+        self.depth_mean = None
 
 
 class StepState:
